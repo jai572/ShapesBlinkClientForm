@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { generateConsultationPDF } from "@/lib/pdf";
 import { DownloadIcon, SearchIcon } from "@/components/Icons";
@@ -16,6 +17,7 @@ function dataUrlFromBlob(blob: Blob): Promise<string> {
 }
 
 export default function ConsoleTable({ entries }: { entries: Consultation[] }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [exportingId, setExportingId] = useState<string | null>(null);
 
@@ -82,7 +84,11 @@ export default function ConsoleTable({ entries }: { entries: Consultation[] }) {
                 </tr>
               )}
               {filtered.map((entry) => (
-                <tr key={entry.id} className="hover:bg-indigo-50/30 transition-colors group">
+                <tr
+                  key={entry.id}
+                  onClick={() => router.push(`/console/${entry.id}`)}
+                  className="hover:bg-indigo-50/30 transition-colors group cursor-pointer"
+                >
                   <td className="px-10 py-8">
                     <p className="font-black text-slate-900 text-lg leading-tight">
                       {entry.first_name} {entry.last_name}
@@ -97,12 +103,16 @@ export default function ConsoleTable({ entries }: { entries: Consultation[] }) {
                     <div className="inline-flex items-center gap-3">
                       <a
                         href={`/console/${entry.id}`}
+                        onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-3 px-6 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm"
                       >
                         View Record
                       </a>
                       <button
-                        onClick={() => handleExport(entry)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExport(entry);
+                        }}
                         disabled={exportingId === entry.id}
                         className="inline-flex items-center gap-3 px-6 py-3 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-all uppercase tracking-widest shadow-sm disabled:opacity-50"
                       >
