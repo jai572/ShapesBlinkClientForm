@@ -74,6 +74,13 @@ export default function ConsoleTable({ entries }: { entries: Consultation[] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-10 py-16 text-center text-sm font-bold text-slate-400 uppercase tracking-widest">
+                    No records match &ldquo;{search}&rdquo;
+                  </td>
+                </tr>
+              )}
               {filtered.map((entry) => (
                 <tr key={entry.id} className="hover:bg-indigo-50/30 transition-colors group">
                   <td className="px-10 py-8">
