@@ -124,7 +124,19 @@ export default function ConsultationDetail({
             <div className="w-1.5 h-8 bg-indigo-600 rounded-full" /> Treatment Setup
           </h2>
           <div className="space-y-6">
-            <Field label="Requested Service" value={entry.treatment_name} />
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Requested Service(s)</p>
+              <div className="flex flex-wrap gap-2">
+                {entry.requested_services.map((s) => (
+                  <span
+                    key={s}
+                    className="px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-tight"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">

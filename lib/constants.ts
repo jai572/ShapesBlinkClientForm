@@ -1,5 +1,16 @@
 export const SALON_NAME = "Shape Blink & Brow";
 
+export const SERVICES = [
+  "Threading",
+  "Eyebrow Tint",
+  "Eyelash Tint",
+  "Heena Tint",
+  "Hybrid Tint",
+  "Eyebrow Lamination",
+  "Heena Tattoo",
+  "Glitter Tattoo",
+];
+
 export const MEDICAL_CONDITIONS = [
   "Heart Condition",
   "Thrombosis / Phlebitis",

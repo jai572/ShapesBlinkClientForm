@@ -7,7 +7,7 @@ export interface Consultation {
   mobile: string;
   address: string | null;
   medical_conditions: string[];
-  treatment_name: string;
+  requested_services: string[];
   been_to_salon: boolean;
   patch_test_status: boolean;
   no_patch_consent: boolean | null;
@@ -23,7 +23,7 @@ export interface ConsultationInput {
   mobile: string;
   address: string;
   medical_conditions: string[];
-  treatment_name: string;
+  requested_services: string[];
   been_to_salon: boolean;
   patch_test_status: boolean;
   no_patch_consent: boolean | null;

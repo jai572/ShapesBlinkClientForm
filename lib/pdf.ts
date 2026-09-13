@@ -41,7 +41,7 @@ export function generateConsultationPDF(entry: Consultation, signatureDataUrl: s
   ]);
 
   const treatmentRows: (string | null)[][] = [
-    ["Requested Service", entry.treatment_name],
+    ["Requested Service(s)", entry.requested_services.join(", ") || "N/A"],
     ["Previous Salon Visit", entry.been_to_salon ? "Yes" : "No"],
     ["Patch Test Status", entry.patch_test_status ? "Yes" : "No"],
   ];

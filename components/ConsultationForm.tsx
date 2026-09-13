@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CONSENT_STATEMENT, MEDICAL_CONDITIONS, SALON_NAME } from "@/lib/constants";
+import { CONSENT_STATEMENT, MEDICAL_CONDITIONS, SALON_NAME, SERVICES } from "@/lib/constants";
 import SignaturePad from "@/components/SignaturePad";
 
 interface FormState {
@@ -12,7 +12,7 @@ interface FormState {
   mobile: string;
   address: string;
   medicalConditions: string[];
-  treatmentName: string;
+  requestedServices: string[];
   beenToSalon: "Yes" | "No";
   patchTestStatus: "Yes" | "No";
   noPatchConsent: "Yes" | "No";
@@ -27,7 +27,7 @@ const initialState: FormState = {
   mobile: "",
   address: "",
   medicalConditions: [],
-  treatmentName: "",
+  requestedServices: [],
   beenToSalon: "No",
   patchTestStatus: "No",
   noPatchConsent: "No",
@@ -60,9 +60,23 @@ export default function ConsultationForm() {
     }));
   };
 
+  const toggleService = (service: string) => {
+    setData((prev) => ({
+      ...prev,
+      requestedServices: prev.requestedServices.includes(service)
+        ? prev.requestedServices.filter((s) => s !== service)
+        : [...prev.requestedServices, service],
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (data.requestedServices.length === 0) {
+      setError("Please select at least one requested service.");
+      return;
+    }
 
     if (!data.signatureImage) {
       setError("Please sign the document before submitting.");
@@ -86,7 +100,7 @@ export default function ConsultationForm() {
         mobile: data.mobile,
         address: data.address,
         medical_conditions: data.medicalConditions,
-        treatment_name: data.treatmentName,
+        requested_services: data.requestedServices,
         been_to_salon: data.beenToSalon === "Yes",
         patch_test_status: data.patchTestStatus === "Yes",
         no_patch_consent: data.patchTestStatus === "No" ? data.noPatchConsent === "Yes" : null,
@@ -221,14 +235,25 @@ export default function ConsultationForm() {
           </h2>
           <div className="space-y-8">
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Requested Service</label>
-              <input
-                required
-                placeholder="e.g. Volume Lash Full Set"
-                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white transition-all font-medium"
-                value={data.treatmentName}
-                onChange={(e) => setData({ ...data, treatmentName: e.target.value })}
-              />
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">
+                Requested Service (select all that apply)
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {SERVICES.map((service) => (
+                  <button
+                    type="button"
+                    key={service}
+                    onClick={() => toggleService(service)}
+                    className={`p-4 text-[10px] font-black rounded-xl border transition-all text-left uppercase tracking-tight ${
+                      data.requestedServices.includes(service)
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-lg"
+                        : "bg-white border-slate-100 text-slate-500 hover:border-indigo-200"
+                    }`}
+                  >
+                    {service}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
