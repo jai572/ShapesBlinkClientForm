@@ -19,13 +19,15 @@ export default function ConsoleTable({ entries }: { entries: Consultation[] }) {
   const [search, setSearch] = useState("");
   const [exportingId, setExportingId] = useState<string | null>(null);
 
-  const filtered = useMemo(
-    () =>
-      entries.filter((e) =>
-        `${e.first_name} ${e.last_name}`.toLowerCase().includes(search.toLowerCase())
-      ),
-    [entries, search]
-  );
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return entries;
+    return entries.filter((e) =>
+      [`${e.first_name} ${e.last_name}`, e.email, e.mobile].some((field) =>
+        field.toLowerCase().includes(q)
+      )
+    );
+  }, [entries, search]);
 
   const handleExport = async (entry: Consultation) => {
     setExportingId(entry.id);
@@ -55,7 +57,7 @@ export default function ConsoleTable({ entries }: { entries: Consultation[] }) {
             </span>
             <input
               className="w-full pl-16 pr-8 py-5 rounded-[2rem] border-none bg-white shadow-inner focus:ring-4 focus:ring-indigo-50 font-semibold text-slate-700"
-              placeholder="Search by name..."
+              placeholder="Search by name, email, or phone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -85,13 +87,21 @@ export default function ConsoleTable({ entries }: { entries: Consultation[] }) {
                     {new Date(entry.created_at).toLocaleDateString("en-GB")}
                   </td>
                   <td className="px-10 py-8 text-right">
-                    <button
-                      onClick={() => handleExport(entry)}
-                      disabled={exportingId === entry.id}
-                      className="inline-flex items-center gap-3 px-6 py-3 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-all uppercase tracking-widest shadow-sm disabled:opacity-50"
-                    >
-                      <DownloadIcon /> {exportingId === entry.id ? "Exporting..." : "Export PDF"}
-                    </button>
+                    <div className="inline-flex items-center gap-3">
+                      <a
+                        href={`/console/${entry.id}`}
+                        className="inline-flex items-center gap-3 px-6 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm"
+                      >
+                        View Record
+                      </a>
+                      <button
+                        onClick={() => handleExport(entry)}
+                        disabled={exportingId === entry.id}
+                        className="inline-flex items-center gap-3 px-6 py-3 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black text-slate-700 hover:border-indigo-600 hover:text-indigo-600 transition-all uppercase tracking-widest shadow-sm disabled:opacity-50"
+                      >
+                        <DownloadIcon /> {exportingId === entry.id ? "..." : "PDF"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

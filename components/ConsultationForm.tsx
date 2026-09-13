@@ -113,9 +113,19 @@ export default function ConsultationForm() {
           </svg>
         </div>
         <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-3">Consultation Received</h1>
-        <p className="text-slate-500 font-medium">
+        <p className="text-slate-500 font-medium mb-10">
           Thank you, {data.firstName}. Your record has been securely submitted to {SALON_NAME}.
         </p>
+        <button
+          onClick={() => {
+            setData(initialState);
+            setError(null);
+            setSubmitted(false);
+          }}
+          className="px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-100"
+        >
+          Start Next Consultation
+        </button>
       </div>
     );
   }
