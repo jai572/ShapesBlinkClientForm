@@ -16,27 +16,20 @@ export default async function LoginPage({
           <LockIcon />
         </div>
         <h2 className="text-3xl font-black text-slate-900 tracking-tighter mb-2">Vault Access</h2>
-        <p className="text-slate-400 font-medium mb-8">Sign in to view {SALON_NAME} records.</p>
+        <p className="text-slate-400 font-medium mb-8">Enter the PIN to view {SALON_NAME} records.</p>
         <form action={login} className="space-y-4" autoComplete="off">
           <input
             required
-            type="email"
-            name="email"
-            placeholder="Admin email"
+            type="password"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={6}
+            name="pin"
+            placeholder="Admin PIN"
             autoComplete="off"
             data-1p-ignore
             data-lpignore="true"
-            className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl text-center font-medium"
-          />
-          <input
-            required
-            type="password"
-            name="password"
-            placeholder="Password"
-            autoComplete="new-password"
-            data-1p-ignore
-            data-lpignore="true"
-            className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl text-center font-medium"
+            className="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl text-center text-2xl tracking-[0.5em] font-medium"
           />
           {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
           <button
