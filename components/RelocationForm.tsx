@@ -16,8 +16,8 @@ const initialState: FormState = {
 };
 
 const inputClass =
-  "w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white transition-all font-medium";
-const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2";
+  "w-full px-4 py-3 sm:p-4 text-base bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white transition-all font-medium";
+const labelClass = "text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 sm:mb-2";
 
 export default function RelocationForm() {
   const [data, setData] = useState<FormState>(initialState);
@@ -47,15 +47,15 @@ export default function RelocationForm() {
 
   if (submitted) {
     return (
-      <div className="max-w-2xl mx-auto py-24 px-6 text-center animate-fade-in">
+      <div className="flex-grow w-full max-w-2xl mx-auto px-5 sm:px-6 py-12 flex flex-col items-center justify-center text-center animate-fade-in">
         <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-200 mx-auto mb-8">
           <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-3">Thank You</h2>
-        <p className="text-slate-500 font-medium mb-10">
-          We&rsquo;ve received your details and will message you our new address soon.
+        <p className="text-slate-500 font-medium mb-10 max-w-sm">
+          We&rsquo;ve got your details and will message you with our new address.
         </p>
         <button
           onClick={() => {
@@ -63,7 +63,7 @@ export default function RelocationForm() {
             setError(null);
             setSubmitted(false);
           }}
-          className="px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-100"
+          className="w-full sm:w-auto px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-100"
         >
           Go Back to Fill a New Form
         </button>
@@ -72,16 +72,19 @@ export default function RelocationForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto py-12 px-6 animate-fade-in">
-      <div className="mb-10">
-        <h2 className="text-4xl font-black text-slate-900 tracking-tight">We Are Moving</h2>
-        <p className="text-slate-500 mt-4 font-medium leading-relaxed">
-          Due to unforeseen circumstances, we will be moving to a new location. Please provide your contact details
-          so we can message you the new address for our salon. We hope for your continued support.
+    <form
+      onSubmit={handleSubmit}
+      className="flex-grow w-full max-w-2xl mx-auto px-5 sm:px-6 py-6 sm:py-12 flex flex-col animate-fade-in"
+    >
+      <div className="mb-6 sm:mb-10">
+        <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">We&rsquo;re Moving</h2>
+        <p className="text-slate-600 mt-3 sm:mt-4 font-medium leading-relaxed">
+          Due to unforeseen circumstances, our salon is moving to a new location. Leave your details and we&rsquo;ll
+          message you our new address. Thank you for your continued support.
         </p>
       </div>
 
-      <div className="bg-white p-8 md:p-10 rounded-[2.5rem] card-shadow border border-slate-100 space-y-8">
+      <div className="bg-white p-5 sm:p-10 rounded-[1.75rem] sm:rounded-[2.5rem] card-shadow border border-slate-100 space-y-4 sm:space-y-8">
         <div>
           <label htmlFor="customerName" className={labelClass}>Customer Name</label>
           <input
@@ -124,14 +127,18 @@ export default function RelocationForm() {
       </div>
 
       {error && (
-        <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-2xl text-sm font-semibold text-red-700">{error}</div>
+        <div className="mt-4 sm:mt-8 p-4 bg-red-50 border border-red-200 rounded-2xl text-sm font-semibold text-red-700">{error}</div>
       )}
 
-      <div className="mt-10 flex justify-end">
+      <p className="mt-3 sm:mt-4 px-1 text-xs text-slate-400 font-medium">
+        We&rsquo;ll only use these details to tell you about our move.
+      </p>
+
+      <div className="mt-auto pt-5 sm:pt-10 flex justify-end">
         <button
           type="submit"
           disabled={submitting}
-          className="w-full sm:w-auto px-16 py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-100 disabled:opacity-50"
+          className="w-full sm:w-auto px-16 py-4 sm:py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-100 disabled:opacity-50"
         >
           {submitting ? "Submitting..." : "Submit"}
         </button>
