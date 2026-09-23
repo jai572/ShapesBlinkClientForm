@@ -79,7 +79,7 @@ export default function RelocationForm() {
       <div className="mb-6 sm:mb-10">
         <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">We&rsquo;re Moving</h2>
         <p className="text-slate-600 mt-3 sm:mt-4 font-medium leading-relaxed">
-          Due to unforeseen circumstances, our salon is moving to a new location. Leave your details and we&rsquo;ll
+          Due to unforeseen circumstances, our salon is moving to a new location. Please leave your details and we&rsquo;ll
           message you our new address. Thank you for your continued support.
         </p>
       </div>
