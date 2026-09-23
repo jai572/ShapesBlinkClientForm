@@ -52,3 +52,19 @@ This trades some security for speed of entry: a 6-digit PIN is a much smaller ke
 - The client-side hardcoded admin PIN (`VAULT_PASSWORD`) from the original Kaaya app has been replaced with a server-verified PIN backed by real Supabase Auth — the original was visible in browser devtools/view-source and provided no actual access control.
 - Signature images are uploaded to a private Supabase Storage bucket instead of being embedded as base64 blobs in the database row.
 - PDF export is unchanged in spirit (client-side `jspdf` + `jspdf-autotable`), now pulling data from Supabase instead of Google Sheets.
+
+## Relocation page
+
+- `/relocation` — public "we're moving" form. Customers leave name, phone and email; rows go to `relocation_contacts` (public can insert, never read).
+- `/relocation/contacts` — gated list of those sign-ups, with its own login (separate from the console PIN) and a Log Out button.
+
+The viewer login is checked inside Postgres (`supabase/migrations/0004_relocation_viewer.sql`): only a bcrypt hash is stored, 5 wrong passwords lock the account for 15 minutes, and sessions last 12 hours. Because this repo is public, viewer accounts are **not** created by a migration. Add or reset one in the Supabase SQL editor:
+
+```sql
+insert into relocation_viewer_accounts (username, password_hash)
+values ('<user id>', extensions.crypt('<password>', extensions.gen_salt('bf', 10)))
+on conflict (username) do update
+  set password_hash = excluded.password_hash, failed_attempts = 0, locked_until = null;
+```
+
+To sign everyone out immediately: `delete from relocation_viewer_sessions;`
