@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import RelocationForm from "@/components/RelocationForm";
 import { ShieldIcon } from "@/components/Icons";
-
-const HEADER_NAME = "Shapes Blink and Brow";
+import { SALON_NAME } from "@/lib/constants";
 
 export const metadata: Metadata = {
-  title: `${HEADER_NAME} - We Are Moving`,
-  description: `Leave your contact details and ${HEADER_NAME} will message you our new address.`,
+  title: `${SALON_NAME} - We Are Moving`,
+  description: `Leave your contact details and ${SALON_NAME} will message you our new address.`,
 };
 
 export default function RelocationPage() {
@@ -17,7 +16,7 @@ export default function RelocationPage() {
           <div className="w-12 h-12 bg-indigo-600 rounded-[1rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-200">
             <ShieldIcon />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{HEADER_NAME}</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{SALON_NAME}</h1>
         </div>
       </header>
       <main className="flex-grow">
@@ -25,7 +24,7 @@ export default function RelocationPage() {
       </main>
       <footer className="py-12 text-center bg-white border-t border-slate-100">
         <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.5em]">
-          {HEADER_NAME} &bull; {new Date().getFullYear()}
+          {SALON_NAME} &bull; {new Date().getFullYear()}
         </p>
       </footer>
     </div>
