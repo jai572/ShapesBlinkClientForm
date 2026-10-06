@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { sendEmailBatch, sendTestEmail } from "@/app/relocation/contacts/actions";
 import { DEFAULT_BODY, DEFAULT_SUBJECT, EMAIL_FOOTER, draftMarkers, firstName, personalise } from "@/lib/emailTemplate";
@@ -182,7 +182,7 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
       key={value}
       type="button"
       onClick={() => setFilter(value)}
-      className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-wider transition-all ${
+      className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider transition-all sm:px-4 sm:py-2 ${
         filter === value ? "bg-indigo-600 text-white shadow-lg" : "bg-white text-slate-500 border border-slate-200 hover:border-indigo-200"
       }`}
     >
@@ -192,119 +192,136 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
 
   const previewName = recipients[0]?.customer_name ?? "Neha";
 
-  return (
+  const sharedNote = (
     <>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Sign-ups</h2>
-          <p className="mt-2 font-medium text-slate-500">Customers waiting for your new address.</p>
-        </div>
-        <div className="flex items-end gap-5">
-          <div className="text-right">
-            <p className="text-3xl font-black leading-none text-indigo-600 sm:text-4xl">{contacts.length}</p>
-            <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Total</p>
+      {counts.shared} sign-ups used one shared email address, so email can&rsquo;t reach them. Contact them by phone &mdash; they can&rsquo;t be selected.
+    </>
+  );
+  const startsSharedGroup = (i: number) => visible[i].g === "shared" && (i === 0 || visible[i - 1].g !== "shared");
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Fixed: everything above the names stays put; only the list scrolls. */}
+      <div className="shrink-0">
+        <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Sign-ups</h2>
+            <p className="mt-0.5 hidden text-sm font-medium text-slate-500 sm:block">Customers waiting for your new address.</p>
           </div>
-          {!selecting && (
+          <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+            <div className="text-right">
+              <p className="text-2xl font-black leading-none text-indigo-600 sm:text-3xl">{contacts.length}</p>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Total</p>
+            </div>
+            {!selecting && (
+              <button
+                type="button"
+                onClick={() => setSelecting(true)}
+                className="rounded-2xl bg-indigo-600 px-4 py-3 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95 sm:px-6 sm:py-4"
+              >
+                Email clients
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="-mx-5 mb-3 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:mb-4 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+          {chip("all", "All", contacts.length)}
+          {chip("unsent", "Not emailed", counts.unsent)}
+          {chip("sent", "Emailed", counts.sent)}
+          {counts.shared > 0 && chip("shared", "Shared email", counts.shared)}
+        </div>
+
+        {selecting && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-100 bg-white p-3 shadow-md sm:mb-4 sm:gap-3 sm:p-4">
+            <p className="mr-auto text-sm font-bold text-slate-700">
+              {recipients.length} {recipients.length === 1 ? "person" : "people"} selected
+            </p>
+            <button type="button" onClick={selectAllVisible} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50 sm:px-4">
+              Select all not emailed
+            </button>
+            <button type="button" onClick={() => setSelected(new Set())} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50 sm:px-4">
+              Clear
+            </button>
+            <button type="button" onClick={endSelecting} className="rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-slate-100 sm:px-4">
+              Cancel
+            </button>
             <button
               type="button"
-              onClick={() => setSelecting(true)}
-              className="rounded-2xl bg-indigo-600 px-6 py-4 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95"
+              disabled={recipients.length === 0}
+              onClick={() => setComposing(true)}
+              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-lg hover:bg-indigo-700 disabled:opacity-40"
             >
-              Email clients
+              Write email →
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        {chip("all", "All", contacts.length)}
-        {chip("unsent", "Not emailed", counts.unsent)}
-        {chip("sent", "Emailed", counts.sent)}
-        {counts.shared > 0 && chip("shared", "Shared email", counts.shared)}
-      </div>
-
-      {counts.shared > 0 && (
-        <p className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
-          {counts.shared} sign-ups used one shared email address, so email can&rsquo;t reach them. They are listed last and can&rsquo;t be selected &mdash; contact them by phone.
-        </p>
-      )}
-
-      {selecting && (
-        <div className="sticky top-[4.5rem] z-40 mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-indigo-100 bg-white p-4 shadow-xl sm:top-[5.5rem]">
-          <p className="mr-auto text-sm font-bold text-slate-700">
-            {recipients.length} {recipients.length === 1 ? "person" : "people"} selected
-          </p>
-          <button type="button" onClick={selectAllVisible} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50">
-            Select all not emailed
-          </button>
-          <button type="button" onClick={() => setSelected(new Set())} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50">
-            Clear
-          </button>
-          <button type="button" onClick={endSelecting} className="rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-slate-100">
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={recipients.length === 0}
-            onClick={() => setComposing(true)}
-            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-lg hover:bg-indigo-700 disabled:opacity-40"
-          >
-            Write email →
-          </button>
-        </div>
-      )}
-
-      {visible.length === 0 ? (
-        <div className="rounded-[2rem] border border-slate-100 bg-white p-10 text-center font-medium text-slate-500 card-shadow">Nothing to show here.</div>
-      ) : (
-        <>
-          {/* Phones: one card per customer */}
-          <ul className="space-y-3 sm:hidden">
-            {visible.map(({ c, g }) => (
-              <li key={c.id} className="flex gap-4 rounded-[1.5rem] border border-slate-100 bg-white p-5 card-shadow">
-                {selecting && <div className="pt-1">{checkbox(c, g)}</div>}
-                <div className="min-w-0 flex-1">
-                  <p className="text-lg font-black text-slate-900">{c.customer_name}</p>
-                  <a href={`tel:${c.phone}`} className="mt-2 block font-semibold text-indigo-600">{c.phone}</a>
-                  <a href={`mailto:${c.email}`} className="mt-1 block break-all font-medium text-slate-600">{c.email}</a>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {badge(c, g)}
-                    <span className="text-xs font-medium text-slate-400">{formatWhen(c.created_at)}</span>
+      {/* Scrolls: the list. On wider screens it is a card with pinned column names. */}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-4 sm:rounded-[2rem] sm:border sm:border-slate-100 sm:bg-white sm:pb-0 sm:shadow-sm">
+        {visible.length === 0 ? (
+          <div className="rounded-[2rem] border border-slate-100 bg-white p-10 text-center font-medium text-slate-500 sm:border-0">Nothing to show here.</div>
+        ) : (
+          <>
+            {/* Phones: one card per customer */}
+            <ul className="space-y-3 sm:hidden">
+              {visible.map(({ c, g }, i) => (
+                <li key={c.id} className="list-none">
+                  {startsSharedGroup(i) && (
+                    <p className="mb-3 mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">{sharedNote}</p>
+                  )}
+                  <div className="flex gap-4 rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
+                    {selecting && <div className="pt-1">{checkbox(c, g)}</div>}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-lg font-black text-slate-900">{c.customer_name}</p>
+                      <a href={`tel:${c.phone}`} className="mt-2 block font-semibold text-indigo-600">{c.phone}</a>
+                      <a href={`mailto:${c.email}`} className="mt-1 block break-all font-medium text-slate-600">{c.email}</a>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {badge(c, g)}
+                        <span className="text-xs font-medium text-slate-400">{formatWhen(c.created_at)}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
 
-          {/* Tablets and desktops: table */}
-          <div className="hidden overflow-hidden rounded-[2rem] border border-slate-100 bg-white card-shadow sm:block">
-            <table className="w-full text-left">
-              <thead className="border-b border-slate-100 bg-slate-50">
+            {/* Tablets and desktops: table with pinned column names */}
+            <table className="hidden w-full text-left sm:table">
+              <thead>
                 <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  {selecting && <th className="w-12 py-4 pl-6" />}
-                  <th className="px-6 py-4">Customer Name</th>
-                  <th className="px-6 py-4">Phone Number</th>
-                  <th className="px-6 py-4">Email</th>
-                  <th className="px-6 py-4">Submitted</th>
-                  <th className="px-6 py-4">Status</th>
+                  {selecting && <th className="sticky top-0 z-10 w-12 bg-slate-50 py-4 pl-6 shadow-[0_1px_0_0_#f1f5f9]" />}
+                  <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 shadow-[0_1px_0_0_#f1f5f9]">Customer Name</th>
+                  <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 shadow-[0_1px_0_0_#f1f5f9]">Phone Number</th>
+                  <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 shadow-[0_1px_0_0_#f1f5f9]">Email</th>
+                  <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 shadow-[0_1px_0_0_#f1f5f9]">Submitted</th>
+                  <th className="sticky top-0 z-10 bg-slate-50 px-6 py-4 shadow-[0_1px_0_0_#f1f5f9]">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {visible.map(({ c, g }) => (
-                  <tr key={c.id} className={`font-medium text-slate-700 ${g === "sent" ? "bg-emerald-50/30" : ""}`}>
-                    {selecting && <td className="py-4 pl-6">{checkbox(c, g)}</td>}
-                    <td className="px-6 py-4 font-bold text-slate-900">{c.customer_name}</td>
-                    <td className="px-6 py-4"><a href={`tel:${c.phone}`} className="text-indigo-600 hover:underline">{c.phone}</a></td>
-                    <td className="break-all px-6 py-4"><a href={`mailto:${c.email}`} className="hover:underline">{c.email}</a></td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{formatWhen(c.created_at)}</td>
-                    <td className="px-6 py-4">{badge(c, g)}</td>
-                  </tr>
+                {visible.map(({ c, g }, i) => (
+                  <Fragment key={c.id}>
+                    {startsSharedGroup(i) && (
+                      <tr>
+                        <td colSpan={selecting ? 6 : 5} className="bg-amber-50 px-6 py-3 text-sm font-semibold text-amber-800">{sharedNote}</td>
+                      </tr>
+                    )}
+                    <tr className={`font-medium text-slate-700 ${g === "sent" ? "bg-emerald-50/30" : ""}`}>
+                      {selecting && <td className="py-4 pl-6">{checkbox(c, g)}</td>}
+                      <td className="px-6 py-4 font-bold text-slate-900">{c.customer_name}</td>
+                      <td className="px-6 py-4"><a href={`tel:${c.phone}`} className="text-indigo-600 hover:underline">{c.phone}</a></td>
+                      <td className="break-all px-6 py-4"><a href={`mailto:${c.email}`} className="hover:underline">{c.email}</a></td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{formatWhen(c.created_at)}</td>
+                      <td className="px-6 py-4">{badge(c, g)}</td>
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
 
       {composing && (
         <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-900/50 sm:p-6" role="dialog" aria-modal="true" aria-label="Write email">
@@ -399,6 +416,6 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
