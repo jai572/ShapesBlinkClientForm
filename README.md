@@ -68,18 +68,3 @@ on conflict (username) do update
 ```
 
 To sign everyone out immediately: `delete from relocation_viewer_sessions;`
-
-## Console PIN (stored in the database)
-
-The `/console` PIN can live in the database instead of the `ADMIN_PIN` env var (`supabase/migrations/0005_console_pin.sql`). Only a bcrypt hash is stored, and 5 wrong attempts lock the console login for 15 minutes. Until a row exists, the login falls back to `ADMIN_PIN`. `ADMIN_EMAIL`/`ADMIN_PASSWORD` stay in Vercel: they are the real Supabase account the PIN signs into.
-
-Set or change the PIN (4-6 digits) in the Supabase SQL editor:
-
-```sql
-insert into console_pin (pin_hash)
-values (extensions.crypt('<PIN>', extensions.gen_salt('bf', 10)))
-on conflict (id) do update
-  set pin_hash = excluded.pin_hash, failed_attempts = 0, locked_until = null, updated_at = now();
-```
-
-Unlock after too many wrong attempts: `update console_pin set failed_attempts = 0, locked_until = null;`

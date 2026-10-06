@@ -1,3 +1,9 @@
+-- NOTE: UNUSED. This was an experiment to store the /console PIN in the
+-- database. It was abandoned and is not wired into the app (the login still
+-- uses the ADMIN_PIN env var). The table and function exist in the live
+-- database only; they can be dropped with:
+--   drop function console_pin_check(text); drop table console_pin;
+--
 -- Console PIN stored in the database as a bcrypt hash, so it can be set and
 -- changed from the Supabase SQL editor instead of a Vercel environment
 -- variable. The PIN itself is never committed (this repo is public); see the
