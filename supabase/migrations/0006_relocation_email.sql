@@ -1,18 +1,14 @@
--- WORK IN PROGRESS - not fully applied to the live database yet.
--- Applied so far: the email_* columns, the anon column-level insert grant,
--- relocation_viewer_check / _session_valid, _claim_emails and _mark_emails.
--- NOT applied: the replacement of relocation_viewer_contacts() below (it
--- drops the old function first). Held back pending a decision on creating it
--- under a new name instead so nothing needs to be dropped.
---
 -- Emailing relocation sign-ups from the gated contacts page.
+-- (Applied to the live database in several small pieces; this file is the
+-- combined, final state.)
 --
--- Each row tracks whether the relocation email has gone out. Sending is a
--- two-step, database-enforced process so nobody is emailed twice:
+-- Sending is a two-step, database-enforced process so nobody is emailed twice:
 --   1. relocation_viewer_claim_emails() atomically marks rows 'sending' and
---      returns the one row per distinct email address that should be mailed.
+--      returns one row per distinct email address that should be mailed.
 --   2. relocation_viewer_mark_emails() records 'sent' or 'failed' afterwards.
--- Rows sharing an email address are treated as one recipient.
+-- Rows sharing an email address count as one recipient, EXCEPT addresses used
+-- by 3+ different phone numbers: those are not one person's inbox (e.g. staff
+-- typing in walk-ins), so they are never emailed and never marked as sent.
 
 alter table relocation_contacts
   add column if not exists email_sent_at timestamptz,
@@ -25,8 +21,8 @@ alter table relocation_contacts
 revoke insert on relocation_contacts from anon;
 grant insert (customer_name, phone, email) on relocation_contacts to anon;
 
--- Internal: raises unless the token is a live viewer session. Not callable
--- through the API (no grants); the security-definer functions below run it.
+-- Internal: raises unless the token is a live viewer session. Not granted to
+-- the API roles; the security-definer functions below call it.
 create or replace function relocation_viewer_check(p_token text)
 returns void
 language plpgsql
@@ -59,12 +55,13 @@ as $$
       and s.expires_at > now()
   );
 $$;
+revoke all on function relocation_viewer_session_valid(text) from public, anon, authenticated;
+grant execute on function relocation_viewer_session_valid(text) to anon;
 
--- The list: not-yet-emailed first (newest first), emailed ones at the bottom
--- (most recently emailed first). A row counts as emailed if any row with the
--- same address has been, so repeat sign-ups never look unsent.
-drop function if exists relocation_viewer_contacts(text);
-create or replace function relocation_viewer_contacts(p_token text)
+-- The list used by the contacts page. (Replaces relocation_viewer_contacts(),
+-- which is left in place, unused, so nothing had to be dropped.) A row counts
+-- as emailed if any row with the same address has been.
+create or replace function relocation_viewer_contacts_v2(p_token text)
 returns table (
   id uuid,
   created_at timestamptz,
@@ -96,6 +93,7 @@ begin
            coalesce(max(c.email_sent_at) over w, c.created_at) desc;
 end;
 $$;
+grant execute on function relocation_viewer_contacts_v2(text) to anon;
 
 -- Claims the addresses behind p_ids for sending. Skips addresses already
 -- emailed or currently being sent (a claim older than 10 minutes counts as
@@ -126,6 +124,13 @@ begin
     update public.relocation_contacts c
     set email_status = 'sending', email_claimed_at = now(), email_error = null
     where lower(btrim(c.email)) in (select k from picked)
+      -- An address shared by 3+ different phone numbers is not one person's
+      -- inbox. Never email it or mark anyone as sent.
+      and (
+        select count(distinct s.phone)
+        from public.relocation_contacts s
+        where lower(btrim(s.email)) = lower(btrim(c.email))
+      ) < 3
       and (
         p_resend
         or (
@@ -148,6 +153,8 @@ begin
   order by lower(btrim(cl.email)), cl.created_at;
 end;
 $$;
+revoke all on function relocation_viewer_claim_emails(text, uuid[], boolean) from public, anon, authenticated;
+grant execute on function relocation_viewer_claim_emails(text, uuid[], boolean) to anon;
 
 -- Records the outcome for one recipient (p_id as returned by the claim),
 -- applying it to every row that shares the address.
@@ -170,12 +177,5 @@ begin
     );
 end;
 $$;
-
-revoke all on function relocation_viewer_session_valid(text) from public, anon, authenticated;
-revoke all on function relocation_viewer_contacts(text) from public, anon, authenticated;
-revoke all on function relocation_viewer_claim_emails(text, uuid[], boolean) from public, anon, authenticated;
 revoke all on function relocation_viewer_mark_emails(text, uuid, boolean, text) from public, anon, authenticated;
-grant execute on function relocation_viewer_session_valid(text) to anon;
-grant execute on function relocation_viewer_contacts(text) to anon;
-grant execute on function relocation_viewer_claim_emails(text, uuid[], boolean) to anon;
 grant execute on function relocation_viewer_mark_emails(text, uuid, boolean, text) to anon;

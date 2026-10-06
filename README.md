@@ -68,3 +68,13 @@ on conflict (username) do update
 ```
 
 To sign everyone out immediately: `delete from relocation_viewer_sessions;`
+
+## Emailing relocation sign-ups
+
+On `/relocation/contacts`, **Email clients** shows checkboxes next to each sign-up, lets you write one message (`{name}` becomes each person's first name), and sends it from the salon's Gmail. Emailed people get an **Email sent** badge and move to the bottom of the list; not-yet-emailed people stay on top; failed sends stay on top so they can be retried.
+
+- **Connect Gmail:** in the salon's Google account turn on 2-Step Verification, create an *App password*, then add `GMAIL_USER` and `GMAIL_APP_PASSWORD` (optionally `EMAIL_FROM_NAME`, `EMAIL_REPLY_TO`) in Vercel and redeploy. Until then the screen works but cannot send. Gmail allows roughly 500 emails a day.
+- **Draft guard:** sending to clients is blocked while the subject or message still contains a `[TEST ...]` or `[NEW ADDRESS ...]` marker. "Send test" to yourself is always allowed.
+- **No double sends:** the database claims each address before it is emailed (`supabase/migrations/0006_relocation_email.sql`). Several sign-ups with the same address get one email.
+- **Shared addresses:** an address used by 3 or more different phone numbers is treated as not one person's inbox. Those sign-ups are listed last, can't be selected, and need a phone call.
+- "Email sent" means Gmail accepted the message, not that it was delivered or read.

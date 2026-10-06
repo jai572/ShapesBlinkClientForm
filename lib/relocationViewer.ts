@@ -9,13 +9,7 @@ export const VIEWER_COOKIE = "relocation_viewer";
 export const VIEWER_PATH = "/relocation/contacts";
 export const VIEWER_SESSION_SECONDS = 12 * 60 * 60;
 
-export interface RelocationContact {
-  id: string;
-  created_at: string;
-  customer_name: string;
-  phone: string;
-  email: string;
-}
+export type { RelocationContact } from "@/lib/relocationTypes";
 
 export function createAnonClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {

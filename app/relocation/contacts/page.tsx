@@ -1,33 +1,27 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import RelocationContactsList from "@/components/RelocationContactsList";
 import { ShieldIcon } from "@/components/Icons";
 import { SALON_NAME } from "@/lib/constants";
+import { emailMode } from "@/lib/email";
 import { VIEWER_COOKIE, VIEWER_PATH, createAnonClient, type RelocationContact } from "@/lib/relocationViewer";
 import { logout } from "./actions";
 
 export const dynamic = "force-dynamic";
+// Sending a batch of emails takes several seconds; the default would cut it off.
+export const maxDuration = 60;
 
 export const metadata: Metadata = {
   title: `${SALON_NAME} - Relocation Contacts`,
   robots: { index: false, follow: false },
 };
 
-const formatSubmitted = (iso: string) =>
-  new Date(iso).toLocaleString("en-GB", {
-    timeZone: "Europe/London",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
 export default async function RelocationContactsPage() {
   const token = (await cookies()).get(VIEWER_COOKIE)?.value;
   if (!token) redirect(`${VIEWER_PATH}/login`);
 
-  const { data, error } = await createAnonClient().rpc("relocation_viewer_contacts", { p_token: token });
+  const { data, error } = await createAnonClient().rpc("relocation_viewer_contacts_v2", { p_token: token });
 
   if (error?.code === "28000") {
     redirect(`${VIEWER_PATH}/login?error=${encodeURIComponent("Your session has expired. Please sign in again.")}`);
@@ -60,17 +54,6 @@ export default async function RelocationContactsPage() {
       </header>
 
       <main className="flex-grow w-full max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
-        <div className="mb-6 sm:mb-8 flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Sign-ups</h2>
-            <p className="text-slate-500 mt-2 font-medium">Customers waiting for your new address, newest first.</p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-3xl sm:text-4xl font-black text-indigo-600 leading-none">{contacts.length}</p>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Total</p>
-          </div>
-        </div>
-
         {error ? (
           <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-sm font-semibold text-red-700">
             Couldn&rsquo;t load contacts right now. Please refresh the page.
@@ -80,55 +63,7 @@ export default async function RelocationContactsPage() {
             No sign-ups yet.
           </div>
         ) : (
-          <>
-            {/* Phones: one card per customer */}
-            <ul className="sm:hidden space-y-3">
-              {contacts.map((c) => (
-                <li key={c.id} className="bg-white p-5 rounded-[1.5rem] card-shadow border border-slate-100">
-                  <p className="text-lg font-black text-slate-900">{c.customer_name}</p>
-                  <a href={`tel:${c.phone}`} className="block mt-2 font-semibold text-indigo-600">
-                    {c.phone}
-                  </a>
-                  <a href={`mailto:${c.email}`} className="block mt-1 font-medium text-slate-600 break-all">
-                    {c.email}
-                  </a>
-                  <p className="mt-3 text-xs font-medium text-slate-400">{formatSubmitted(c.created_at)}</p>
-                </li>
-              ))}
-            </ul>
-
-            {/* Tablets and desktops: table */}
-            <div className="hidden sm:block bg-white rounded-[2rem] card-shadow border border-slate-100 overflow-hidden">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <th className="px-6 py-4">Customer Name</th>
-                    <th className="px-6 py-4">Phone Number</th>
-                    <th className="px-6 py-4">Email</th>
-                    <th className="px-6 py-4">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {contacts.map((c) => (
-                    <tr key={c.id} className="font-medium text-slate-700">
-                      <td className="px-6 py-4 font-bold text-slate-900">{c.customer_name}</td>
-                      <td className="px-6 py-4">
-                        <a href={`tel:${c.phone}`} className="text-indigo-600 hover:underline">
-                          {c.phone}
-                        </a>
-                      </td>
-                      <td className="px-6 py-4 break-all">
-                        <a href={`mailto:${c.email}`} className="hover:underline">
-                          {c.email}
-                        </a>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{formatSubmitted(c.created_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+          <RelocationContactsList contacts={contacts} emailMode={emailMode()} />
         )}
       </main>
 
