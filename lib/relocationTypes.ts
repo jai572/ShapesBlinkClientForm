@@ -54,6 +54,7 @@ export interface SmsOverview {
   gateway_last_seen: string | null;
   hourly_limit: number;
   sent_last_hour: number;
+  manual_waiting: number;
   counts: { queued: number; sending: number; sent: number; failed: number };
   test: { status: SmsStatus | "cancelled"; error: string | null; created_at: string } | null;
   items: SmsItem[];

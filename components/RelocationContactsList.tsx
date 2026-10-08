@@ -6,6 +6,7 @@ import { sendEmailBatch, sendTestEmail } from "@/app/relocation/contacts/actions
 import { DEFAULT_BODY, DEFAULT_SUBJECT, EMAIL_FOOTER, draftMarkers, firstName, personalise } from "@/lib/emailTemplate";
 import { emailKey, findSharedAddresses, toUkMobile, type RelocationContact, type SmsOverview } from "@/lib/relocationTypes";
 import SmsComposer from "@/components/SmsComposer";
+import TapToText from "@/components/TapToText";
 
 type Group = "unsent" | "sent" | "shared";
 type Filter = "all" | Group;
@@ -31,6 +32,7 @@ export default function RelocationContactsList({ contacts, emailMode, sms }: Pro
   const router = useRouter();
   const [mode, setMode] = useState<"email" | "text" | null>(null);
   const selecting = mode !== null;
+  const [tapOpen, setTapOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>("all");
   const [composing, setComposing] = useState(false);
@@ -266,6 +268,15 @@ export default function RelocationContactsList({ contacts, emailMode, sms }: Pro
                 >
                   Text clients
                 </button>
+                {sms && sms.manual_waiting > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setTapOpen(true)}
+                    className="rounded-2xl bg-emerald-600 px-4 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-emerald-700 active:scale-95 sm:px-5 sm:py-4"
+                  >
+                    Resume texting · {sms.manual_waiting}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -478,6 +489,18 @@ export default function RelocationContactsList({ contacts, emailMode, sms }: Pro
           }}
           onQueued={() => {
             endSelecting();
+            router.refresh();
+          }}
+          onStartTap={() => {
+            endSelecting();
+            setTapOpen(true);
+          }}
+        />
+      )}
+      {tapOpen && (
+        <TapToText
+          onClose={() => {
+            setTapOpen(false);
             router.refresh();
           }}
         />

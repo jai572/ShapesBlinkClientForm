@@ -163,7 +163,7 @@ export async function sendTestEmail(to: string, subject: string, body: string): 
 // portal only queues messages; the phone fetches and sends them.
 // ---------------------------------------------------------------------------
 
-const MAX_TEXT_BATCH = 300;
+const MAX_TEXT_BATCH = 400;
 
 async function viewerToken() {
   return (await cookies()).get(VIEWER_COOKIE)?.value ?? null;
@@ -179,6 +179,7 @@ export async function getSmsOverview(): Promise<SmsOverview | null> {
 export async function queueSms(
   ids: string[],
   body: string,
+  method: "phone" | "tap" = "phone",
 ): Promise<{ ok: true; queued: number; skipped: number } | { ok: false; error: string }> {
   const token = await viewerToken();
   if (!token) return { ok: false, error: SESSION_EXPIRED };
@@ -204,7 +205,10 @@ export async function queueSms(
     .filter((c) => wanted.has(c.id))
     .map((c) => ({ contact_id: c.id, body: renderSms(body, c.customer_name) }));
 
-  const { data, error } = await supabase.rpc("relocation_viewer_queue_sms", { p_token: token, p_messages: messages });
+  const { data, error } = await supabase.rpc(method === "tap" ? "relocation_viewer_queue_manual_sms" : "relocation_viewer_queue_sms", {
+    p_token: token,
+    p_messages: messages,
+  });
   if (error) {
     return { ok: false, error: error.code === "28000" ? SESSION_EXPIRED : "Could not queue the texts. Please try again." };
   }
@@ -246,4 +250,25 @@ export async function createGatewayKey(): Promise<{ ok: true; key: string } | { 
   });
   if (error) return { ok: false, error: error.code === "28000" ? SESSION_EXPIRED : "Could not create the key." };
   return { ok: true, key };
+}
+
+// ---- Tap-to-text: one person at a time, sent by hand from the phone's own Messages app ----
+
+export type ManualSms = { id: string; to: string; body: string; name: string };
+export type ManualNext = { ok: true; message: ManualSms | null; waiting: number; done: number } | { ok: false; error: string };
+
+export async function getNextManualSms(): Promise<ManualNext> {
+  const token = await viewerToken();
+  if (!token) return { ok: false, error: SESSION_EXPIRED };
+  const { data, error } = await createAnonClient().rpc("relocation_viewer_manual_sms_next", { p_token: token });
+  if (error) return { ok: false, error: error.code === "28000" ? SESSION_EXPIRED : "Could not load the next person." };
+  return { ok: true, message: data.message, waiting: data.waiting, done: data.done };
+}
+
+export async function manualSmsResult(id: string, action: "sent" | "skip"): Promise<{ ok: boolean; error?: string }> {
+  const token = await viewerToken();
+  if (!token) return { ok: false, error: SESSION_EXPIRED };
+  if (!UUID.test(id) || (action !== "sent" && action !== "skip")) return { ok: false, error: "Invalid request." };
+  const { error } = await createAnonClient().rpc("relocation_viewer_manual_sms_result", { p_token: token, p_id: id, p_action: action });
+  return error ? { ok: false, error: error.code === "28000" ? SESSION_EXPIRED : "Could not save that. Please try again." } : { ok: true };
 }

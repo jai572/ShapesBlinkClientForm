@@ -11,11 +11,14 @@ interface Props {
   initial: SmsOverview;
   onClose: () => void;
   onQueued: () => void;
+  /** tap-to-text: close this and open the one-at-a-time screen */
+  onStartTap: () => void;
 }
 
 const BASE = typeof window === "undefined" ? "" : window.location.origin;
 
-export default function SmsComposer({ recipients, initial, onClose, onQueued }: Props) {
+export default function SmsComposer({ recipients, initial, onClose, onQueued, onStartTap }: Props) {
+  const [method, setMethod] = useState<"tap" | "phone">("tap");
   const [overview, setOverview] = useState<SmsOverview>(initial);
   const [body, setBody] = useState(DEFAULT_SMS);
   const [testTo, setTestTo] = useState("");
@@ -70,8 +73,13 @@ export default function SmsComposer({ recipients, initial, onClose, onQueued }: 
   const queueAll = () =>
     run("queue", async () => {
       setConfirming(false);
-      const res = await queueSms(recipients.map((r) => r.id), body);
+      const res = await queueSms(recipients.map((r) => r.id), body, method);
       if (!res.ok) return setNote({ ok: false, text: res.error });
+      if (method === "tap") {
+        if (res.queued === 0) return setNote({ ok: false, text: "Nobody was added: they have already been texted, or have no valid UK mobile." });
+        onStartTap();
+        return;
+      }
       setNote({ ok: true, text: `${res.queued} texts queued${res.skipped ? `, ${res.skipped} skipped (already texted or no valid mobile)` : ""}. They go out one at a time from the phone.` });
       const o = await getSmsOverview();
       if (o) setOverview(o);
@@ -120,7 +128,7 @@ curl -fsS ${BASE}/api/sms/script -o ~/sms-gateway.sh && chmod +x ~/sms-gateway.s
           <div>
             <h3 className="text-2xl font-black tracking-tight text-slate-900">Text clients</h3>
             <p className="mt-1 text-sm font-medium text-slate-500">
-              {recipients.length} {recipients.length === 1 ? "person" : "people"} selected, each addressed by first name. Sent one at a time from the salon phone.
+              {recipients.length} {recipients.length === 1 ? "person" : "people"} selected, each addressed by first name.{method === "phone" ? " Sent one at a time from the salon phone." : " You send each one yourself from this phone."}
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-slate-100">
@@ -128,6 +136,36 @@ curl -fsS ${BASE}/api/sms/script -o ~/sms-gateway.sh && chmod +x ~/sms-gateway.s
           </button>
         </div>
 
+        <div className="mb-5 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="How to send">
+          {([
+            ["tap", "Tap to text", "From this phone, one person at a time. You press send in your normal Messages app. No extra apps or permissions."],
+            ["phone", "Automatic", "A script on the salon's Android phone (Termux) sends them for you, paced to protect the number."],
+          ] as const).map(([value, title, text]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={method === value}
+              onClick={() => setMethod(value)}
+              className={`rounded-2xl border p-4 text-left transition-all ${method === value ? "border-indigo-600 bg-indigo-50 shadow-md" : "border-slate-200 bg-white hover:border-indigo-200"}`}
+            >
+              <span className="block text-sm font-black text-slate-900">{title}</span>
+              <span className="mt-1 block text-xs font-medium leading-relaxed text-slate-500">{text}</span>
+            </button>
+          ))}
+        </div>
+
+        {method === "tap" && overview.manual_waiting > 0 && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm font-semibold text-indigo-900">
+            <span>{overview.manual_waiting} people are still waiting from an earlier session.</span>
+            <button type="button" onClick={onStartTap} className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black uppercase tracking-wider text-white hover:bg-indigo-700">
+              Resume
+            </button>
+          </div>
+        )}
+
+        {method === "phone" && (
+          <>
         <div className={`mb-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-4 text-sm font-semibold ${phoneOnline ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
           <span>
             {phoneOnline
@@ -167,6 +205,9 @@ curl -fsS ${BASE}/api/sms/script -o ~/sms-gateway.sh && chmod +x ~/sms-gateway.s
           </div>
         )}
 
+          </>
+        )}
+
         {markers.length > 0 && (
           <p className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
             This is still a draft (it contains {markers.join(" and ")}). You can send a test text to your own mobile, but texting clients is blocked until those are removed.
@@ -184,6 +225,8 @@ curl -fsS ${BASE}/api/sms/script -o ~/sms-gateway.sh && chmod +x ~/sms-gateway.s
         <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400">Preview for {firstName(previewName)}</p>
         <div className="mb-6 rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm leading-relaxed text-slate-700">{preview}</div>
 
+        {method === "phone" && (
+          <>
         <div className="mb-6 rounded-2xl border border-slate-100 p-4">
           <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-400" htmlFor="sms-test">Send a test text to your own mobile first</label>
           <div className="flex flex-wrap gap-3">
@@ -216,13 +259,20 @@ curl -fsS ${BASE}/api/sms/script -o ~/sms-gateway.sh && chmod +x ~/sms-gateway.s
           </div>
         )}
 
+          </>
+        )}
+
         {note && <p className={`mb-4 text-sm font-semibold ${note.ok ? "text-emerald-700" : "text-red-600"}`}>{note.text}</p>}
 
         {confirming ? (
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
-            <p className="mr-auto text-sm font-bold text-red-800">Queue {recipients.length} {recipients.length === 1 ? "text" : "texts"} from the salon number? You can stop the rest while they&rsquo;re going out.</p>
+            <p className="mr-auto text-sm font-bold text-red-800">
+              {method === "tap"
+                ? `Add ${recipients.length} ${recipients.length === 1 ? "person" : "people"} to the tap-to-text list? You'll text them one at a time from this phone.`
+                : `Queue ${recipients.length} ${recipients.length === 1 ? "text" : "texts"} from the salon number? You can stop the rest while they're going out.`}
+            </p>
             <button type="button" onClick={() => setConfirming(false)} className="rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-white">Back</button>
-            <button type="button" onClick={queueAll} className="rounded-xl bg-red-600 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:bg-red-700">Yes, queue them</button>
+            <button type="button" onClick={queueAll} className="rounded-xl bg-red-600 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:bg-red-700">{method === "tap" ? "Yes, start" : "Yes, queue them"}</button>
           </div>
         ) : (
           <button
@@ -231,7 +281,7 @@ curl -fsS ${BASE}/api/sms/script -o ~/sms-gateway.sh && chmod +x ~/sms-gateway.s
             onClick={() => setConfirming(true)}
             className="w-full rounded-2xl bg-indigo-600 py-5 text-sm font-black uppercase tracking-widest text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-40"
           >
-            Queue {recipients.length} {recipients.length === 1 ? "text" : "texts"}
+            {method === "tap" ? `Start tap-to-text · ${recipients.length} ${recipients.length === 1 ? "person" : "people"}` : `Queue ${recipients.length} ${recipients.length === 1 ? "text" : "texts"}`}
           </button>
         )}
       </div>

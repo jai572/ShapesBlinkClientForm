@@ -88,3 +88,7 @@ On `/relocation/contacts`, **Email clients** shows checkboxes next to each sign-
 - **Pacing:** the phone waits 10-20 s between texts, and the database hands out at most `hourly_limit` texts per rolling hour (default 60) to protect the salon's number. Change it with `update relocation_sms_gateway set hourly_limit = 100;`.
 - **Safety:** one text per phone number; UK mobiles only; clients can't be texted while the message still contains `[TEST]` or `[NEW ADDRESS]` (test texts to your own mobile always work); a text the phone took but never reported on is marked failed, never resent automatically.
 - "Text sent" means the phone handed the message to the network, not that it was delivered.
+
+### Tap-to-text (no extra apps)
+
+In **Text clients**, the default way of sending is **Tap to text**: the portal queues the texts (`manual = true` in `relocation_sms`, see `0008_relocation_sms_manual.sql`) and shows one person at a time. **Open Messages** opens the phone's own Messages app with the text already written (`sms:+44...?&body=...`); press send there, come back, and tap **Yes, I sent it**. Progress lives in the database, so closing the page and coming back (**Resume texting**) continues where you left off. The portal can't see whether Messages actually sent the text, so "Text sent" means "you said you sent it". The automatic Termux route ignores tap-to-text messages and vice versa, so a text can never go out twice.
