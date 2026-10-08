@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getNextManualSms, manualSmsResult, type ManualSms } from "@/app/relocation/contacts/actions";
 import { firstName } from "@/lib/emailTemplate";
 
@@ -17,6 +17,15 @@ export default function TapToText({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [onPhone, setOnPhone] = useState(true);
   const [copied, setCopied] = useState<"msg" | "num" | null>(null);
+  // The person just marked as sent, so a mis-tap can be taken back for a few seconds.
+  const [justSent, setJustSent] = useState<{ id: string; name: string } | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearUndo = useCallback(() => {
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = null;
+    setJustSent(null);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -34,6 +43,9 @@ export default function TapToText({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     setOnPhone(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
     load();
+    return () => {
+      if (undoTimer.current) clearTimeout(undoTimer.current);
+    };
   }, [load]);
 
   const answer = async (action: "sent" | "skip") => {
@@ -42,6 +54,22 @@ export default function TapToText({ onClose }: { onClose: () => void }) {
     const res = await manualSmsResult(msg.id, action);
     setSaving(false);
     if (!res.ok) return setError(res.error ?? "Something went wrong.");
+    clearUndo();
+    if (action === "sent") {
+      setJustSent({ id: msg.id, name: msg.name ? firstName(msg.name) : "customer" });
+      undoTimer.current = setTimeout(() => setJustSent(null), 5000);
+    }
+    await load();
+  };
+
+  const undo = async () => {
+    if (!justSent) return;
+    const { id } = justSent;
+    clearUndo();
+    setSaving(true);
+    const res = await manualSmsResult(id, "undo");
+    setSaving(false);
+    if (!res.ok) return setError(res.error ?? "Could not undo that.");
     await load();
   };
 
@@ -69,10 +97,19 @@ export default function TapToText({ onClose }: { onClose: () => void }) {
             {done} done &middot; {waiting} left
           </p>
         </div>
-        <button type="button" onClick={onClose} className="rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-slate-100">
-          Close
+        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50">
+          Back to list
         </button>
       </div>
+
+      {justSent && (
+        <div className="flex shrink-0 items-center justify-between gap-3 bg-emerald-50 px-5 py-2.5 text-sm font-bold text-emerald-800" aria-live="polite">
+          <span>&#10003; Sent to {justSent.name}</span>
+          <button type="button" disabled={saving} onClick={undo} className="rounded-lg px-3 py-1 text-xs font-black uppercase tracking-wider text-emerald-900 underline hover:bg-emerald-100 disabled:opacity-50">
+            Undo
+          </button>
+        </div>
+      )}
 
       {total > 0 && (
         <div className="h-1.5 shrink-0 bg-slate-100">

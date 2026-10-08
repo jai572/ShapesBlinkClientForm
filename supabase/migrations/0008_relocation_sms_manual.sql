@@ -90,7 +90,9 @@ begin
 end;
 $$;
 
--- "I sent it" (sent) or "skip this person" (skip -> cancelled, can be queued again later).
+-- "I sent it" (sent), "skip this person" (skip -> cancelled, can be queued again later),
+-- or take back a mis-tap (undo: only a text marked sent in the last 5 minutes goes back
+-- to the front of the waiting list).
 create or replace function relocation_viewer_manual_sms_result(p_token text, p_id uuid, p_action text)
 returns json
 language plpgsql
@@ -99,14 +101,22 @@ set search_path = ''
 as $$
 begin
   perform public.relocation_viewer_check(p_token);
-  if p_action not in ('sent', 'skip') then
+  if p_action not in ('sent', 'skip', 'undo') then
     raise exception 'bad_action' using errcode = '22023';
   end if;
-  update public.relocation_sms
-  set status = case when p_action = 'sent' then 'sent' else 'cancelled' end,
-      claimed_at = case when p_action = 'sent' then now() else claimed_at end,
-      sent_at = case when p_action = 'sent' then now() else null end
-  where id = p_id and manual and status = 'queued';
+
+  if p_action = 'undo' then
+    update public.relocation_sms
+    set status = 'queued', claimed_at = null, sent_at = null
+    where id = p_id and manual and status = 'sent' and sent_at > now() - interval '5 minutes';
+  else
+    update public.relocation_sms
+    set status = case when p_action = 'sent' then 'sent' else 'cancelled' end,
+        claimed_at = case when p_action = 'sent' then now() else claimed_at end,
+        sent_at = case when p_action = 'sent' then now() else null end
+    where id = p_id and manual and status = 'queued';
+  end if;
+
   return json_build_object(
     'waiting', (select count(*) from public.relocation_sms s where s.manual and s.status = 'queued'),
     'done', (select count(*) from public.relocation_sms s where s.manual and s.status = 'sent')

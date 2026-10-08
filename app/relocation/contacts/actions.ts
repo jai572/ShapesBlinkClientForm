@@ -265,10 +265,10 @@ export async function getNextManualSms(): Promise<ManualNext> {
   return { ok: true, message: data.message, waiting: data.waiting, done: data.done };
 }
 
-export async function manualSmsResult(id: string, action: "sent" | "skip"): Promise<{ ok: boolean; error?: string }> {
+export async function manualSmsResult(id: string, action: "sent" | "skip" | "undo"): Promise<{ ok: boolean; error?: string }> {
   const token = await viewerToken();
   if (!token) return { ok: false, error: SESSION_EXPIRED };
-  if (!UUID.test(id) || (action !== "sent" && action !== "skip")) return { ok: false, error: "Invalid request." };
+  if (!UUID.test(id) || (action !== "sent" && action !== "skip" && action !== "undo")) return { ok: false, error: "Invalid request." };
   const { error } = await createAnonClient().rpc("relocation_viewer_manual_sms_result", { p_token: token, p_id: id, p_action: action });
   return error ? { ok: false, error: error.code === "28000" ? SESSION_EXPIRED : "Could not save that. Please try again." } : { ok: true };
 }
