@@ -24,7 +24,8 @@ export default function SmsComposer({ recipients, initial, onClose, onQueued }: 
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [showSetup, setShowSetup] = useState(!initial.gateway_set);
+  // Open the set-up steps until the phone has connected at least once.
+  const [showSetup, setShowSetup] = useState(!initial.gateway_set || initial.gateway_last_seen === null);
   const [now, setNow] = useState(() => Date.now());
 
   // Live status of the phone and the queue.
