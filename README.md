@@ -78,3 +78,13 @@ On `/relocation/contacts`, **Email clients** shows checkboxes next to each sign-
 - **No double sends:** the database claims each address before it is emailed (`supabase/migrations/0006_relocation_email.sql`). Several sign-ups with the same address get one email.
 - **Shared addresses:** an address used by 3 or more different phone numbers is treated as not one person's inbox. Those sign-ups are listed last, can't be selected, and need a phone call.
 - "Email sent" means Gmail accepted the message, not that it was delivered or read.
+
+## Texting sign-ups from the salon's Android phone
+
+`/relocation/contacts` -> **Text clients** queues personalised texts; a small script on the salon's own Android phone (running in Termux) fetches them one at a time and sends them from its SIM, so replies come to that phone and no outside text provider sees the numbers.
+
+- **Database:** `supabase/migrations/0007_relocation_sms.sql`. Messages live in `relocation_sms`; the phone's secret key is stored only as a SHA-256 hash in `relocation_sms_gateway`. Both tables have RLS on with no policies; everything goes through functions that check a viewer session or the gateway key.
+- **Phone set-up:** in the portal, Text clients -> *Set up the phone* shows the exact steps and creates the key (shown once). Needs F-Droid's Termux + Termux:API, the SMS permission for Termux:API, and battery set to Unrestricted. The script is served from `/api/sms/script` and contains no secrets.
+- **Pacing:** the phone waits 10-20 s between texts, and the database hands out at most `hourly_limit` texts per rolling hour (default 60) to protect the salon's number. Change it with `update relocation_sms_gateway set hourly_limit = 100;`.
+- **Safety:** one text per phone number; UK mobiles only; clients can't be texted while the message still contains `[TEST]` or `[NEW ADDRESS]` (test texts to your own mobile always work); a text the phone took but never reported on is marked failed, never resent automatically.
+- "Text sent" means the phone handed the message to the network, not that it was delivered.

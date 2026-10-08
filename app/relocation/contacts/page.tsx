@@ -5,7 +5,8 @@ import RelocationContactsList from "@/components/RelocationContactsList";
 import { ShieldIcon } from "@/components/Icons";
 import { SALON_NAME } from "@/lib/constants";
 import { emailMode } from "@/lib/email";
-import { VIEWER_COOKIE, VIEWER_PATH, createAnonClient, type RelocationContact } from "@/lib/relocationViewer";
+import { VIEWER_COOKIE, VIEWER_PATH, createAnonClient } from "@/lib/relocationViewer";
+import type { RelocationContact, SmsOverview } from "@/lib/relocationTypes";
 import { logout } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,11 @@ export default async function RelocationContactsPage() {
   }
 
   const contacts = (data ?? []) as RelocationContact[];
+
+  // Texting is optional: if the database isn't set up for it yet (or this call
+  // fails) the page still works, with the Text clients button switched off.
+  const { data: smsData, error: smsError } = await createAnonClient().rpc("relocation_viewer_sms_overview", { p_token: token });
+  const sms = smsError ? null : (smsData as SmsOverview);
 
   return (
     <div className="h-screen h-[100dvh] overflow-hidden flex flex-col bg-[#fcfdfe]">
@@ -63,7 +69,7 @@ export default async function RelocationContactsPage() {
             No sign-ups yet.
           </div>
         ) : (
-          <RelocationContactsList contacts={contacts} emailMode={emailMode()} />
+          <RelocationContactsList contacts={contacts} emailMode={emailMode()} sms={sms} />
         )}
       </main>
 

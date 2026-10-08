@@ -35,3 +35,37 @@ export function findSharedAddresses(contacts: RelocationContact[]): Set<string> 
   }
   return shared;
 }
+
+// ---------------------------------------------------------------------------
+// Texting (through the salon's own Android phone; see 0007_relocation_sms.sql)
+// ---------------------------------------------------------------------------
+
+export type SmsStatus = "queued" | "sending" | "sent" | "failed";
+
+export interface SmsItem {
+  to_number: string; // +447xxxxxxxxx
+  status: SmsStatus;
+  sent_at: string | null;
+  error: string | null;
+}
+
+export interface SmsOverview {
+  gateway_set: boolean;
+  gateway_last_seen: string | null;
+  hourly_limit: number;
+  sent_last_hour: number;
+  counts: { queued: number; sending: number; sent: number; failed: number };
+  test: { status: SmsStatus | "cancelled"; error: string | null; created_at: string } | null;
+  items: SmsItem[];
+}
+
+// UK mobile (07xxx, +447xxx, 00447xxx, 4407xxx) -> +447xxxxxxxxx, else null.
+// Must match relocation_to_e164() in the database.
+export function toUkMobile(phone: string): string | null {
+  const d = phone.replace(/\D/g, "");
+  if (/^07[1-57-9]\d{8}$/.test(d)) return "+44" + d.slice(1);
+  if (/^447[1-57-9]\d{8}$/.test(d)) return "+" + d;
+  if (/^00447[1-57-9]\d{8}$/.test(d)) return "+" + d.slice(2);
+  if (/^4407[1-57-9]\d{8}$/.test(d)) return "+44" + d.slice(3);
+  return null;
+}

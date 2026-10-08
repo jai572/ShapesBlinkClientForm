@@ -4,7 +4,8 @@ import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { sendEmailBatch, sendTestEmail } from "@/app/relocation/contacts/actions";
 import { DEFAULT_BODY, DEFAULT_SUBJECT, EMAIL_FOOTER, draftMarkers, firstName, personalise } from "@/lib/emailTemplate";
-import { emailKey, findSharedAddresses, type RelocationContact } from "@/lib/relocationTypes";
+import { emailKey, findSharedAddresses, toUkMobile, type RelocationContact, type SmsOverview } from "@/lib/relocationTypes";
+import SmsComposer from "@/components/SmsComposer";
 
 type Group = "unsent" | "sent" | "shared";
 type Filter = "all" | Group;
@@ -22,11 +23,14 @@ const formatWhen = (iso: string, withTime = true) =>
 interface Props {
   contacts: RelocationContact[];
   emailMode: "gmail" | "json" | "off";
+  /** null when texting isn't set up in the database yet */
+  sms: SmsOverview | null;
 }
 
-export default function RelocationContactsList({ contacts, emailMode }: Props) {
+export default function RelocationContactsList({ contacts, emailMode, sms }: Props) {
   const router = useRouter();
-  const [selecting, setSelecting] = useState(false);
+  const [mode, setMode] = useState<"email" | "text" | null>(null);
+  const selecting = mode !== null;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>("all");
   const [composing, setComposing] = useState(false);
@@ -59,21 +63,29 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
   }, [ordered]);
 
   const visible = ordered.filter(({ g }) => filter === "all" || g === filter);
-  const selectable = (g: Group) => g === "unsent";
+  const smsByNumber = useMemo(() => new Map((sms?.items ?? []).map((i) => [i.to_number, i])), [sms]);
+  const smsOf = (c: RelocationContact) => smsByNumber.get(toUkMobile(c.phone) ?? "");
+  // Texting: any valid UK mobile that hasn't been texted (or whose text failed).
+  const textEligible = (c: RelocationContact) => {
+    if (!sms || !toUkMobile(c.phone)) return false;
+    const item = smsOf(c);
+    return !item || item.status === "failed";
+  };
+  const selectable = (c: RelocationContact, g: Group) => (mode === "text" ? textEligible(c) : g === "unsent");
 
-  // One email per distinct address, however many rows are ticked.
+  // One email per distinct address (one text per distinct number), however many rows are ticked.
   const recipients = useMemo(() => {
     const seen = new Set<string>();
     const out: RelocationContact[] = [];
     for (const { c, g } of ordered) {
-      if (!selected.has(c.id) || !selectable(g)) continue;
-      const key = emailKey(c.email);
+      if (!selected.has(c.id) || !selectable(c, g)) continue;
+      const key = mode === "text" ? (toUkMobile(c.phone) ?? c.id) : emailKey(c.email);
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(c);
     }
     return out;
-  }, [ordered, selected]);
+  }, [ordered, selected, mode, sms]);
 
   const markers = draftMarkers(subject, body);
   const sending = progress !== null;
@@ -88,11 +100,16 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
     });
 
   const selectAllVisible = () =>
-    setSelected(new Set(visible.filter(({ g }) => selectable(g)).map(({ c }) => c.id)));
+    setSelected(new Set(visible.filter(({ c, g }) => selectable(c, g)).map(({ c }) => c.id)));
+
+  // Texting only: everyone who can't be emailed but has a mobile number.
+  const selectCantEmail = () =>
+    setSelected(new Set(ordered.filter(({ c, g }) => g === "shared" && textEligible(c)).map(({ c }) => c.id)));
 
   const endSelecting = () => {
-    setSelecting(false);
+    setMode(null);
     setSelected(new Set());
+    setComposing(false);
   };
 
   const closeCompose = () => {
@@ -164,8 +181,26 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
     return null;
   };
 
+  const smsBadge = (c: RelocationContact) => {
+    const item = smsOf(c);
+    if (!item) return null;
+    if (item.status === "sent")
+      return (
+        <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-emerald-700">
+          Text sent{item.sent_at ? ` · ${formatWhen(item.sent_at, false)}` : ""}
+        </span>
+      );
+    if (item.status === "failed")
+      return (
+        <span title={item.error ?? undefined} className="inline-flex rounded-full bg-red-50 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-red-700">
+          Text failed · can retry
+        </span>
+      );
+    return <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-slate-500">Text queued</span>;
+  };
+
   const checkbox = (c: RelocationContact, g: Group) =>
-    selectable(g) ? (
+    selectable(c, g) ? (
       <input
         type="checkbox"
         aria-label={`Select ${c.customer_name}`}
@@ -214,13 +249,24 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
               <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Total</p>
             </div>
             {!selecting && (
-              <button
-                type="button"
-                onClick={() => setSelecting(true)}
-                className="rounded-2xl bg-indigo-600 px-4 py-3 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95 sm:px-6 sm:py-4"
-              >
-                Email clients
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMode("email")}
+                  className="rounded-2xl bg-indigo-600 px-4 py-3 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-95 sm:px-6 sm:py-4"
+                >
+                  Email clients
+                </button>
+                <button
+                  type="button"
+                  disabled={!sms}
+                  title={sms ? undefined : "Texting isn't set up yet"}
+                  onClick={() => setMode("text")}
+                  className="rounded-2xl border border-indigo-200 bg-white px-4 py-3 text-xs font-black uppercase tracking-widest text-indigo-700 transition-all hover:bg-indigo-50 active:scale-95 disabled:opacity-40 sm:px-6 sm:py-4"
+                >
+                  Text clients
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -237,8 +283,13 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
             <p className="mr-auto text-sm font-bold text-slate-700">
               {recipients.length} {recipients.length === 1 ? "person" : "people"} selected
             </p>
+            {mode === "text" && counts.shared > 0 && (
+              <button type="button" onClick={selectCantEmail} className="rounded-xl border border-amber-200 px-3 py-2 text-xs font-black uppercase tracking-wider text-amber-700 hover:bg-amber-50 sm:px-4">
+                Select all who can&rsquo;t be emailed
+              </button>
+            )}
             <button type="button" onClick={selectAllVisible} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50 sm:px-4">
-              Select all not emailed
+              {mode === "text" ? "Select all not texted" : "Select all not emailed"}
             </button>
             <button type="button" onClick={() => setSelected(new Set())} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50 sm:px-4">
               Clear
@@ -252,7 +303,7 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
               onClick={() => setComposing(true)}
               className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-lg hover:bg-indigo-700 disabled:opacity-40"
             >
-              Write email →
+              {mode === "text" ? "Write text →" : "Write email →"}
             </button>
           </div>
         )}
@@ -279,6 +330,7 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
                       <a href={`mailto:${c.email}`} className="mt-1 block break-all font-medium text-slate-600">{c.email}</a>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         {badge(c, g)}
+                        {smsBadge(c)}
                         <span className="text-xs font-medium text-slate-400">{formatWhen(c.created_at)}</span>
                       </div>
                     </div>
@@ -313,7 +365,7 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
                       <td className="px-6 py-4"><a href={`tel:${c.phone}`} className="text-indigo-600 hover:underline">{c.phone}</a></td>
                       <td className="break-all px-6 py-4"><a href={`mailto:${c.email}`} className="hover:underline">{c.email}</a></td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">{formatWhen(c.created_at)}</td>
-                      <td className="px-6 py-4">{badge(c, g)}</td>
+                      <td className="px-6 py-4"><div className="flex flex-col items-start gap-1">{badge(c, g)}{smsBadge(c)}</div></td>
                     </tr>
                   </Fragment>
                 ))}
@@ -323,7 +375,7 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
         )}
       </div>
 
-      {composing && (
+      {composing && mode === "email" && (
         <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-900/50 sm:p-6" role="dialog" aria-modal="true" aria-label="Write email">
           <div className="mx-auto min-h-full max-w-2xl bg-white p-5 sm:min-h-0 sm:rounded-[2rem] sm:p-8">
             <div className="mb-6 flex items-start justify-between gap-4">
@@ -415,6 +467,20 @@ export default function RelocationContactsList({ contacts, emailMode }: Props) {
             )}
           </div>
         </div>
+      )}
+      {composing && mode === "text" && sms && (
+        <SmsComposer
+          recipients={recipients}
+          initial={sms}
+          onClose={() => {
+            setComposing(false);
+            router.refresh();
+          }}
+          onQueued={() => {
+            endSelecting();
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );

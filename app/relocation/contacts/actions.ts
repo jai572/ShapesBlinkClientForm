@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import { VIEWER_COOKIE, VIEWER_PATH, VIEWER_SESSION_SECONDS, createAnonClient } from "@/lib/relocationViewer";
 import { draftMarkers, renderEmail } from "@/lib/emailTemplate";
 import { emailMode, sendMail } from "@/lib/email";
+import { createHash, randomBytes } from "node:crypto";
+import { renderSms, smsDraftMarkers } from "@/lib/smsTemplate";
+import type { RelocationContact, SmsOverview } from "@/lib/relocationTypes";
 
 export async function login(formData: FormData) {
   const username = String(formData.get("username") ?? "");
@@ -153,4 +156,94 @@ export async function sendTestEmail(to: string, subject: string, body: string): 
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Send failed" };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Texting through the salon's Android phone (0007_relocation_sms.sql). The
+// portal only queues messages; the phone fetches and sends them.
+// ---------------------------------------------------------------------------
+
+const MAX_TEXT_BATCH = 300;
+
+async function viewerToken() {
+  return (await cookies()).get(VIEWER_COOKIE)?.value ?? null;
+}
+
+export async function getSmsOverview(): Promise<SmsOverview | null> {
+  const token = await viewerToken();
+  if (!token) return null;
+  const { data, error } = await createAnonClient().rpc("relocation_viewer_sms_overview", { p_token: token });
+  return error ? null : (data as SmsOverview);
+}
+
+export async function queueSms(
+  ids: string[],
+  body: string,
+): Promise<{ ok: true; queued: number; skipped: number } | { ok: false; error: string }> {
+  const token = await viewerToken();
+  if (!token) return { ok: false, error: SESSION_EXPIRED };
+
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_TEXT_BATCH || !ids.every((id) => UUID.test(id))) {
+    return { ok: false, error: "Invalid recipient list." };
+  }
+  body = String(body ?? "").trim();
+  if (!body || body.length > 1000) return { ok: false, error: "Please write a message (up to 1000 characters)." };
+
+  const markers = smsDraftMarkers(body);
+  if (markers.length > 0) {
+    return { ok: false, error: `This is still a draft. Remove ${markers.join(" and ")} before texting clients.` };
+  }
+
+  const supabase = createAnonClient();
+  const { data: list, error: listError } = await supabase.rpc("relocation_viewer_contacts_v2", { p_token: token });
+  if (listError) {
+    return { ok: false, error: listError.code === "28000" ? SESSION_EXPIRED : "Could not load the sign-ups. Please try again." };
+  }
+  const wanted = new Set(ids);
+  const messages = (list as RelocationContact[])
+    .filter((c) => wanted.has(c.id))
+    .map((c) => ({ contact_id: c.id, body: renderSms(body, c.customer_name) }));
+
+  const { data, error } = await supabase.rpc("relocation_viewer_queue_sms", { p_token: token, p_messages: messages });
+  if (error) {
+    return { ok: false, error: error.code === "28000" ? SESSION_EXPIRED : "Could not queue the texts. Please try again." };
+  }
+  return { ok: true, queued: data.queued, skipped: data.skipped };
+}
+
+export async function queueTestSms(to: string, body: string): Promise<{ ok: boolean; error?: string }> {
+  const token = await viewerToken();
+  if (!token) return { ok: false, error: SESSION_EXPIRED };
+  body = String(body ?? "").trim();
+  if (!body || body.length > 1000) return { ok: false, error: "Please write a message (up to 1000 characters)." };
+
+  const { data, error } = await createAnonClient().rpc("relocation_viewer_queue_test_sms", {
+    p_token: token,
+    p_to: String(to ?? ""),
+    p_body: renderSms(body, "Test"),
+  });
+  if (error) return { ok: false, error: error.code === "28000" ? SESSION_EXPIRED : "Could not queue the test text." };
+  if (!data?.ok) return { ok: false, error: "Enter a valid UK mobile number, like 07123 456789." };
+  return { ok: true };
+}
+
+export async function cancelQueuedSms(): Promise<{ ok: boolean; cancelled?: number; error?: string }> {
+  const token = await viewerToken();
+  if (!token) return { ok: false, error: SESSION_EXPIRED };
+  const { data, error } = await createAnonClient().rpc("relocation_viewer_cancel_sms", { p_token: token });
+  return error ? { ok: false, error: "Could not stop the queue." } : { ok: true, cancelled: data as number };
+}
+
+// Makes a new secret key for the phone. Shown once; only its hash is stored.
+// Creating a new key switches off whatever key the phone was using before.
+export async function createGatewayKey(): Promise<{ ok: true; key: string } | { ok: false; error: string }> {
+  const token = await viewerToken();
+  if (!token) return { ok: false, error: SESSION_EXPIRED };
+  const key = `sbb_${randomBytes(32).toString("hex")}`;
+  const { error } = await createAnonClient().rpc("relocation_viewer_set_gateway_key", {
+    p_token: token,
+    p_key_hash: createHash("sha256").update(key).digest("hex"),
+  });
+  if (error) return { ok: false, error: error.code === "28000" ? SESSION_EXPIRED : "Could not create the key." };
+  return { ok: true, key };
 }
